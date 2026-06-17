@@ -30,6 +30,9 @@ import org.apache.commons.io.FileUtils
 import org.apache.commons.net.ftp.FTPClient
 import org.apache.commons.net.ftp.FTPClientConfig
 import org.apache.commons.net.ftp.FTPReply
+import javax.imageio.ImageIO
+import java.awt.RenderingHints
+import java.awt.image.BufferedImage
 import com.xortroll.emuiibo.emuiigen.Amiibo
 import com.xortroll.emuiibo.emuiigen.AmiiboStatus
 import com.xortroll.emuiibo.emuiigen.AmiiboStatusKind
@@ -87,6 +90,13 @@ class MainController {
     @FXML lateinit var GenerateSeriesFtpAddress: TextField;
     @FXML lateinit var GenerateSeriesFtpPort: TextField;
     @FXML lateinit var GenerateSeriesButton: Button;
+
+    @FXML lateinit var GenerateOneImageResolutionBox: ComboBox<String>;
+    @FXML lateinit var GenerateAllImageResolutionBox: ComboBox<String>;
+    @FXML lateinit var GenerateSeriesImageResolutionBox: ComboBox<String>;
+
+    @FXML lateinit var GenerateAllGroupSizeBox: ComboBox<String>;
+    @FXML lateinit var GenerateSeriesGroupSizeBox: ComboBox<String>;
 
     lateinit var MainStage: Stage;
     lateinit var OpenedAmiiboPath: String;
@@ -193,6 +203,42 @@ class MainController {
         }
     }
 
+    fun parseImageMaxDim(box: ComboBox<String>): Int? {
+        return when(box.selectionModel.selectedItem) {
+            "128x128" -> 128
+            "256x256" -> 256
+            "512x512" -> 512
+            else -> null
+        }
+    }
+
+    fun parseGroupSize(box: ComboBox<String>): Int {
+        return box.selectionModel.selectedItem?.split(" ")?.first()?.toIntOrNull() ?: 15;
+    }
+
+    fun groupAmiibos(amiibos: List<AmiiboAPIEntry>, targetGroupSize: Int): List<List<AmiiboAPIEntry>> {
+        val sorted = amiibos.sortedBy { it.amiibo_name.lowercase() };
+        if(targetGroupSize == 0 || sorted.size <= targetGroupSize) {
+            return listOf(sorted);
+        }
+        val numGroups = Math.ceil(sorted.size.toDouble() / targetGroupSize.toDouble()).toInt();
+        val groups = mutableListOf<List<AmiiboAPIEntry>>();
+        var start = 0;
+        for(i in 0 until numGroups) {
+            val groupsLeft = numGroups - i;
+            val chunkSize = Math.ceil((sorted.size - start).toDouble() / groupsLeft).toInt();
+            groups.add(sorted.subList(start, start + chunkSize));
+            start += chunkSize;
+        }
+        return groups;
+    }
+
+    fun amiiboGroupName(group: List<AmiiboAPIEntry>): String {
+        val first = group.first().amiibo_name;
+        val last = group.last().amiibo_name;
+        return if(first == last) first else "$first - $last";
+    }
+
     fun chooseBaseAmiiboPath(is_ftp: Boolean) : Pair<String, String>? {
         val path = if(is_ftp) {
             Paths.get(TemporaryFtpDirectory).toAbsolutePath()
@@ -223,7 +269,7 @@ class MainController {
         };
     }
 
-    fun generateAmiibo(path: String, base_path: String, amiibo: AmiiboAPIEntry, amiibo_name: String, use_random_uuid: Boolean, save_image: Boolean, is_ftp: Boolean, ftp_addr: String, ftp_port: Int) : Boolean {
+    fun generateAmiibo(path: String, base_path: String, amiibo: AmiiboAPIEntry, amiibo_name: String, use_random_uuid: Boolean, save_image: Boolean, image_max_dim: Int?, is_ftp: Boolean, ftp_addr: String, ftp_port: Int) : Boolean {
         val local_date = LocalDateTime.now();
         val cur_date = AmiiboDate(local_date.year.toUShort(), local_date.monthValue.toUByte(), local_date.dayOfMonth.toUByte());
 
@@ -237,7 +283,33 @@ class MainController {
             if(save_image) {
                 try {
                     val image_path = Paths.get(path, "amiibo.png").toAbsolutePath().toString();
-                    Utils.netDownloadFile(amiibo.image_url, image_path);
+                    val tmp_path = "$image_path.tmp";
+                    Utils.netDownloadFile(amiibo.image_url, tmp_path);
+
+                    // Convert to RGBA (overlay rejects RGB); optionally downscale to fit within image_max_dim
+                    val src_image = ImageIO.read(File(tmp_path));
+                    if(src_image == null) {
+                        throw Exception("Unrecognized image format (WebP or other unsupported type)");
+                    }
+                    val new_width: Int;
+                    val new_height: Int;
+                    if(image_max_dim != null) {
+                        val scale = (image_max_dim.toDouble() / maxOf(src_image.width, src_image.height).toDouble()).coerceAtMost(1.0);
+                        new_width = (src_image.width * scale).toInt().coerceAtLeast(1);
+                        new_height = (src_image.height * scale).toInt().coerceAtLeast(1);
+                    } else {
+                        new_width = src_image.width;
+                        new_height = src_image.height;
+                    }
+
+                    val rgba_image = BufferedImage(new_width, new_height, BufferedImage.TYPE_INT_ARGB);
+                    val g2d = rgba_image.createGraphics();
+                    g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    g2d.drawImage(src_image, 0, 0, new_width, new_height, null);
+                    g2d.dispose();
+
+                    ImageIO.write(rgba_image, "PNG", File(image_path));
+                    File(tmp_path).delete();
                 }
                 catch(ex: Exception) {
                     System.out.println("Exception saving amiibo image: " + ex.toString());
@@ -440,6 +512,26 @@ class MainController {
         
         this.ApiUrlText.setText(AmiiboAPI.DefaultUrl);
 
+        val resolutionOptions = listOf("128x128", "256x256", "512x512", "Unmodified");
+        this.GenerateOneImageResolutionBox.items.setAll(resolutionOptions);
+        this.GenerateOneImageResolutionBox.selectionModel.select(0);
+        this.GenerateOneImageResolutionBox.disableProperty().bind(this.GenerateOneImageSaveCheck.selectedProperty().not());
+
+        this.GenerateAllImageResolutionBox.items.setAll(resolutionOptions);
+        this.GenerateAllImageResolutionBox.selectionModel.select(0);
+        this.GenerateAllImageResolutionBox.disableProperty().bind(this.GenerateAllImageSaveCheck.selectedProperty().not());
+
+        this.GenerateSeriesImageResolutionBox.items.setAll(resolutionOptions);
+        this.GenerateSeriesImageResolutionBox.selectionModel.select(0);
+        this.GenerateSeriesImageResolutionBox.disableProperty().bind(this.GenerateSeriesImageSaveCheck.selectedProperty().not());
+
+        val groupSizeOptions = listOf("0 (No groups)", "5", "10", "15", "20");
+        this.GenerateAllGroupSizeBox.items.setAll(groupSizeOptions);
+        this.GenerateAllGroupSizeBox.selectionModel.select(0);
+
+        this.GenerateSeriesGroupSizeBox.items.setAll(groupSizeOptions);
+        this.GenerateSeriesGroupSizeBox.selectionModel.select(0);
+
         this.GenerateOneAmiiboSeriesBox.selectionModel.selectedItemProperty().addListener(object : ChangeListener<String?> {
             override fun changed(a: ObservableValue<out String?>, old: String?, new: String?) {
                 this@MainController.updateSelectedAmiiboSeries();
@@ -500,6 +592,7 @@ class MainController {
 
                 val use_random_uuid = this@MainController.GenerateOneUseRandomUuidCheck.isSelected();
                 val save_image = this@MainController.GenerateOneImageSaveCheck.isSelected();
+                val image_max_dim = if(save_image) this@MainController.parseImageMaxDim(this@MainController.GenerateOneImageResolutionBox) else null;
 
                 val paths = this@MainController.chooseBaseAmiiboPath(is_ftp);
                 if(paths != null) {
@@ -511,7 +604,7 @@ class MainController {
                     if(this@MainController.showYesNo("The virtual amiibo will be generated at:\n" + pres_amiibo_path + "/{amiibo.json, amiibo.flag, ...}\n\nProceed with generation?")) {
                         val selected_amiibo = this@MainController.getSelectedAmiibo();
                         if(selected_amiibo != null) {
-                            if(this@MainController.generateAmiibo(amiibo_path, base_path, selected_amiibo, amiibo_name, use_random_uuid, save_image, is_ftp, ftp_addr, ftp_port)) {
+                            if(this@MainController.generateAmiibo(amiibo_path, base_path, selected_amiibo, amiibo_name, use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port)) {
                                 this@MainController.showInfo("The virtual amiibo was successfully generated!");
                             }
                             else {
@@ -542,24 +635,34 @@ class MainController {
 
                 val use_random_uuid = this@MainController.GenerateAllUseRandomUuidCheck.isSelected();
                 val save_image = this@MainController.GenerateAllImageSaveCheck.isSelected();
+                val image_max_dim = if(save_image) this@MainController.parseImageMaxDim(this@MainController.GenerateAllImageResolutionBox) else null;
 
                 val paths = this@MainController.chooseBaseAmiiboPath(is_ftp);
                 if(paths != null) {
                     val (path, pres_path) = paths;
-                    if(this@MainController.showYesNo("The virtual amiibos will be generated at:\n" + pres_path + "/<series>/<amiibo>/{amiibo.json, amiibo.flag, ...}\n\nProceed with generation?")) {
+                    if(this@MainController.showYesNo("The virtual amiibos will be generated at:\n" + pres_path + "/<series>/<group>/<amiibo>/{amiibo.json, amiibo.flag, ...}\n\nProceed with generation?")) {
                         for(amiibos in this@MainController.Amiibos.values) {
-                            for(amiibo in amiibos) {
-                                val amiibo_name = Utils.produceAmiiboName(amiibo.amiibo_name);
-                                val base_path = Paths.get(Utils.ensureValidFileDirectoryName(amiibo.series_name), Utils.ensureValidFileDirectoryName(amiibo.amiibo_name)).toString();
+                            val groups = this@MainController.groupAmiibos(amiibos, this@MainController.parseGroupSize(this@MainController.GenerateAllGroupSizeBox));
+                            val useGroupDir = groups.size > 1;
+                            for(group in groups) {
+                                val group_dir = if(useGroupDir) Utils.ensureValidFileDirectoryName(this@MainController.amiiboGroupName(group)) else null;
+                                for(amiibo in group) {
+                                    val amiibo_name = Utils.produceAmiiboName(amiibo.amiibo_name);
+                                    val base_path = if(group_dir != null) {
+                                        Paths.get(Utils.ensureValidFileDirectoryName(amiibo.series_name), group_dir, Utils.ensureValidFileDirectoryName(amiibo.amiibo_name)).toString();
+                                    } else {
+                                        Paths.get(Utils.ensureValidFileDirectoryName(amiibo.series_name), Utils.ensureValidFileDirectoryName(amiibo.amiibo_name)).toString();
+                                    };
 
-                                val amiibo_path = Paths.get(path, base_path).toString();
-                                val pres_amiibo_path = Paths.get(pres_path, base_path).toString();
-                                
-                                if(this@MainController.generateAmiibo(amiibo_path, base_path, amiibo, amiibo_name, use_random_uuid, save_image, is_ftp, ftp_addr, ftp_port)) {
-                                    System.out.println("Generated virtual amiibo ('" + amiibo_name + "'): '" + pres_amiibo_path + "'");
-                                }
-                                else {
-                                    this@MainController.showError("The following virtual amiibo could not be generated:\n'" + pres_amiibo_path + "'");
+                                    val amiibo_path = Paths.get(path, base_path).toString();
+                                    val pres_amiibo_path = Paths.get(pres_path, base_path).toString();
+
+                                    if(this@MainController.generateAmiibo(amiibo_path, base_path, amiibo, amiibo_name, use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port)) {
+                                        System.out.println("Generated virtual amiibo ('" + amiibo_name + "'): '" + pres_amiibo_path + "'");
+                                    }
+                                    else {
+                                        this@MainController.showError("The following virtual amiibo could not be generated:\n'" + pres_amiibo_path + "'");
+                                    }
                                 }
                             }
                         }
@@ -586,24 +689,34 @@ class MainController {
 
                 val use_random_uuid = this@MainController.GenerateSeriesUseRandomUuidCheck.isSelected();
                 val save_image = this@MainController.GenerateSeriesImageSaveCheck.isSelected();
+                val image_max_dim = if(save_image) this@MainController.parseImageMaxDim(this@MainController.GenerateSeriesImageResolutionBox) else null;
 
                 val paths = this@MainController.chooseBaseAmiiboPath(is_ftp);
                 if(paths != null) {
                     val (path, pres_path) = paths;
-                    if(this@MainController.showYesNo("The virtual amiibos will be generated at:\n" + pres_path + "/<amiibo>/{amiibo.json, amiibo.flag, ...}\n\nProceed with generation?")) {
+                    if(this@MainController.showYesNo("The virtual amiibos will be generated at:\n" + pres_path + "/<group>/<amiibo>/{amiibo.json, amiibo.flag, ...}\n\nProceed with generation?")) {
                         val series_name = this@MainController.GenerateSeriesAmiiboSeriesBox.selectionModel.selectedItem;
-                        for(amiibo in this@MainController.Amiibos.get(series_name)!!) {
-                            val amiibo_name = Utils.produceAmiiboName(amiibo.amiibo_name);
-                            val base_path = Utils.ensureValidFileDirectoryName(amiibo.amiibo_name);
+                        val groups = this@MainController.groupAmiibos(this@MainController.Amiibos.get(series_name)!!, this@MainController.parseGroupSize(this@MainController.GenerateSeriesGroupSizeBox));
+                        val useGroupDir = groups.size > 1;
+                        for(group in groups) {
+                            val group_dir = if(useGroupDir) Utils.ensureValidFileDirectoryName(this@MainController.amiiboGroupName(group)) else null;
+                            for(amiibo in group) {
+                                val amiibo_name = Utils.produceAmiiboName(amiibo.amiibo_name);
+                                val base_path = if(group_dir != null) {
+                                    Paths.get(group_dir, Utils.ensureValidFileDirectoryName(amiibo.amiibo_name)).toString();
+                                } else {
+                                    Utils.ensureValidFileDirectoryName(amiibo.amiibo_name);
+                                };
 
-                            val amiibo_path = Paths.get(path, base_path).toString();
-                            val pres_amiibo_path = Paths.get(pres_path, base_path).toString();
-                            
-                            if(this@MainController.generateAmiibo(amiibo_path, base_path, amiibo, amiibo_name, use_random_uuid, save_image, is_ftp, ftp_addr, ftp_port)) {
-                                System.out.println("Generated virtual amiibo ('" + amiibo_name + "'): '" + pres_amiibo_path + "'");
-                            }
-                            else {
-                                this@MainController.showError("The following virtual amiibo could not be generated:\n'" + pres_amiibo_path + "'");
+                                val amiibo_path = Paths.get(path, base_path).toString();
+                                val pres_amiibo_path = Paths.get(pres_path, base_path).toString();
+
+                                if(this@MainController.generateAmiibo(amiibo_path, base_path, amiibo, amiibo_name, use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port)) {
+                                    System.out.println("Generated virtual amiibo ('" + amiibo_name + "'): '" + pres_amiibo_path + "'");
+                                }
+                                else {
+                                    this@MainController.showError("The following virtual amiibo could not be generated:\n'" + pres_amiibo_path + "'");
+                                }
                             }
                         }
 
