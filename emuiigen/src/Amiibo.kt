@@ -12,7 +12,10 @@ import org.apache.commons.io.IOUtils
 data class Amiibo(var first_write_date: AmiiboDate, var id: AmiiboId, var last_write_date: AmiiboDate, var mii_charinfo_file: String, var name: String, var uuid: UByteArray, var use_random_uuid: Boolean, var version: UInt, var write_counter: UShort, var areas: AmiiboAreaInfo?) {
     companion object {
         val UuidLength = 10;
-        val NameMaxLength = 10;
+
+        // The name is stored by emuiibo in a NUL-terminated UTF-8 buffer of 41 bytes, so this limit is in bytes (not characters)
+        // Note: this is not the in-game amiibo nickname limit (10 characters), which emuiibo applies on its own when a game reads the amiibo
+        val NameMaxLength = 40;
 
         fun randomUuid() : UByteArray {
             val uuid = ByteArray(UuidLength);
@@ -62,7 +65,7 @@ data class Amiibo(var first_write_date: AmiiboDate, var id: AmiiboId, var last_w
                 }
     
                 val name = json.getString("name");
-                if(name.length > NameMaxLength) {
+                if(Utils.stringByteLength(name) > NameMaxLength) {
                     status = status and AmiiboStatusKind.InvalidNameLength;
                 }
     

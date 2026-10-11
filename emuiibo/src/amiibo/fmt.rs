@@ -174,6 +174,17 @@ pub fn generate_areas_json(path: String) -> Result<Option<nfp::AccessId>> {
     Ok(access_id)
 }
 
+// The in-game amiibo nickname is limited to 10 characters, while the name we store for the overlay may be longer
+// Note: slicing by byte index would panic on a non-ASCII name, so cut on a character boundary instead
+fn nickname_of(name: &str) -> &str {
+    const NICKNAME_MAX_CHARS: usize = 10;
+
+    match name.char_indices().nth(NICKNAME_MAX_CHARS) {
+        Some((end, _)) => &name[..end],
+        None => name
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct VirtualAmiibo {
     pub info: VirtualAmiiboInfo,
@@ -353,7 +364,7 @@ impl VirtualAmiibo {
         Ok(nfp::RegisterInfo {
             mii_charinfo: self.mii_charinfo,
             first_write_date: self.info.first_write_date.to_date(),
-            name: util::ArrayString::from_str(&self.info.name[0..self.info.name.len().min(10)]),
+            name: util::ArrayString::from_str(nickname_of(&self.info.name)),
             font_region: 0,
             reserved: [0; 0x7A]
         })
@@ -401,7 +412,7 @@ impl VirtualAmiibo {
         Ok(nfp::RegisterInfoPrivate {
             mii_store_data: mii::StoreData::from_charinfo(self.mii_charinfo)?,
             first_write_date: self.info.first_write_date.to_date(),
-            name: util::ArrayString::from_str(&self.info.name.clone()[0..self.info.name.len().min(10)]),
+            name: util::ArrayString::from_str(nickname_of(&self.info.name)),
             font_region: 0,
             reserved: [0; 0x8E]
         })

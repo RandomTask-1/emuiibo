@@ -75,7 +75,7 @@ The JSON file contains all the aspects and data an amiibo needs to provide to ga
 
 This are the properties an amiibo has:
 
-- Name: the amiibo's name (max. 10 characters, longer names will be automatically limited to 10 by emuiibo)
+- Name: the amiibo's name (max. 40 bytes, longer names will be automatically limited by emuiibo). Note that games only ever see the first 10 characters of it, since that is the limit for an amiibo's in-game nickname -- the full name is what the overlay displays
 
 - UUID: it's a unique identifier for the amiibo, composed of 10 bytes. Common amiibo UUID values seem to have the last 3 bytes zeroed...?
 

@@ -489,8 +489,8 @@ class MainController {
 
         this.OpenedAmiiboNameText.textProperty().addListener(object : ChangeListener<String?> {
             override fun changed(a: ObservableValue<out String?>, old: String?, new: String?) {
-                if(new!!.length > Amiibo.NameMaxLength) {
-                    val str = new.substring(0, Amiibo.NameMaxLength);
+                val str = Utils.truncateStringBytes(new!!, Amiibo.NameMaxLength);
+                if(str != new) {
                     this@MainController.OpenedAmiiboNameText.setText(str);
                 }
             }
@@ -546,8 +546,8 @@ class MainController {
 
         this.AmiiboNameText.textProperty().addListener(object : ChangeListener<String?> {
             override fun changed(a: ObservableValue<out String?>, old: String?, new: String?) {
-                if(new!!.length > Amiibo.NameMaxLength) {
-                    val str = new.substring(0, Amiibo.NameMaxLength);
+                val str = Utils.truncateStringBytes(new!!, Amiibo.NameMaxLength);
+                if(str != new) {
                     this@MainController.AmiiboNameText.setText(str);
                 }
             }

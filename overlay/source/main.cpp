@@ -135,7 +135,7 @@ namespace {
             strm << "emuiibo v" << (int)g_Version.major << "." << (int)g_Version.minor << "." << (int)g_Version.micro;
             strm << " (" << (g_Version.dev_build ? "dev" : "release") << ")";
             if(g_InitializationStatus == InitializationStatus::OkVersionMismatch) {
-                strm << "(outdated, expected v" << (int)ExpectedVersion.major << "." << (int)ExpectedVersion.minor << "." << (int)ExpectedVersion.micro << ")";
+                strm << " (outdated, expected v" << (int)ExpectedVersion.major << "." << (int)ExpectedVersion.minor << "." << (int)ExpectedVersion.micro << ")";
             }
             return strm.str();
         }
@@ -844,11 +844,13 @@ class EmuiiboOverlay : public tsl::Overlay {
             }
 
             g_Version = emu::GetVersion();
-            if(!g_Version.EqualsExceptBuild(ExpectedVersion)) {
+            if(g_Version.EqualsExceptBuild(ExpectedVersion)) {
+                g_InitializationStatus = InitializationStatus::Ok;
+            }
+            else {
                 g_InitializationStatus = InitializationStatus::OkVersionMismatch;
             }
 
-            g_InitializationStatus = InitializationStatus::Ok;
             char virtual_amiibo_dir_str[FS_MAX_PATH] = {};
             emu::GetVirtualAmiiboDirectory(virtual_amiibo_dir_str, sizeof(virtual_amiibo_dir_str));
             g_VirtualAmiiboDirectory.assign(virtual_amiibo_dir_str);

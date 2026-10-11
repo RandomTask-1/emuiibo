@@ -85,19 +85,27 @@ class Utils {
             return true;
         }
 
-        val RemovableAmiiboNameCharacters = charArrayOf(' ', '-', '.', '\'');
+        fun stringByteLength(str: String) : Int {
+            return str.toByteArray(Charsets.UTF_8).size;
+        }
 
-        fun produceAmiiboName(base_name: String) : String {
-            // To retain as much of the name as possible when clamping to the limit, remove spaces and other less important ones
-            var name = base_name;
-            for(ch in RemovableAmiiboNameCharacters) {
-                name = name.replace(ch.toString(), "");
+        fun truncateStringBytes(str: String, len: Int) : String {
+            val bytes = str.toByteArray(Charsets.UTF_8);
+            if(bytes.size <= len) {
+                return str;
             }
 
-            // Now apply the limit
-            name = truncateString(name, Amiibo.NameMaxLength);
+            // Back up to the start of the character being cut, so we never leave half of one behind
+            var end = len;
+            while((end > 0) && ((bytes[end].toInt() and 0xC0) == 0x80)) {
+                end--;
+            }
 
-            return name;
+            return String(bytes, 0, end, Charsets.UTF_8);
+        }
+
+        fun produceAmiiboName(base_name: String) : String {
+            return truncateStringBytes(base_name, Amiibo.NameMaxLength);
         }
     }
 }
