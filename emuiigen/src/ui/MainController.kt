@@ -269,7 +269,7 @@ class MainController {
         };
     }
 
-    fun generateAmiibo(path: String, base_path: String, amiibo: AmiiboAPIEntry, amiibo_name: String, use_random_uuid: Boolean, save_image: Boolean, image_max_dim: Int?, is_ftp: Boolean, ftp_addr: String, ftp_port: Int) : Boolean {
+    fun generateAmiibo(path: String, base_path: String, amiibo: AmiiboAPIEntry, amiibo_name: String, use_random_uuid: Boolean, save_image: Boolean, image_max_dim: Int?, is_ftp: Boolean, ftp_addr: String, ftp_port: Int) : String? {
         val local_date = LocalDateTime.now();
         val cur_date = AmiiboDate(local_date.year.toUShort(), local_date.monthValue.toUByte(), local_date.dayOfMonth.toUByte());
 
@@ -312,8 +312,7 @@ class MainController {
                     File(tmp_path).delete();
                 }
                 catch(ex: Exception) {
-                    System.out.println("Exception saving amiibo image: " + ex.toString());
-                    return false;
+                    return "Unable to save the amiibo image: " + ex.toString();
                 }
             }
 
@@ -328,16 +327,14 @@ class MainController {
 
                     val reply = client.replyCode;
                     if(!FTPReply.isPositiveCompletion(reply)) {
-                        this@MainController.showError("The FTP server refused connection...");
                         client.disconnect();
-                        return false;
+                        return "The FTP server refused connection";
                     }
 
                     client.makeDirectory(ftp_base_dir);
                     if(!Utils.ensureFtpDirectory(client, ftp_base_dir)) {
-                        this@MainController.showError("Unable to ensure FTP directory '" + ftp_base_dir + "': " + client.replyCode.toString());
                         client.disconnect();
-                        return false;
+                        return "Unable to ensure FTP directory '" + ftp_base_dir + "': " + client.replyCode.toString();
                     }
 
                     client.enterLocalPassiveMode();
@@ -347,27 +344,99 @@ class MainController {
                         client.storeFile(ftp_path, strm);
                         strm.close();
                         if(!FTPReply.isPositiveCompletion(client.replyCode)) {
-                            this@MainController.showError("Unable to store FTP file '" + ftp_path + "': " + client.replyCode.toString());
                             client.disconnect();
-                            return false;
+                            return "Unable to store FTP file '" + ftp_path + "': " + client.replyCode.toString();
                         }
                     }
 
                     client.disconnect();
-                    return true;
+                    return null;
                 }
                 catch(ex: Exception) {
-                    this@MainController.showError("Exception on FTP connection: " + ex.toString());
                     client.disconnect();
-                    return false;
+                    return "Exception on FTP connection: " + ex.toString();
                 }
             }
 
-            return true;
+            return null;
         }
         else {
-            return false;
+            return "Unable to write the virtual amiibo files";
         }
+    }
+
+    class GenerationItem(val amiibo_path: String, val base_path: String, val entry: AmiiboAPIEntry, val amiibo_name: String, val pres_amiibo_path: String);
+
+    private fun setGenerationDisabled(disabled: Boolean) {
+        this.GenerateOneButton.setDisable(disabled);
+        this.GenerateAllButton.setDisable(disabled);
+        this.GenerateSeriesButton.setDisable(disabled);
+    }
+
+    // Generation runs on a background thread: doing it on the JavaFX application thread
+    // blocks the event loop, which makes the window stop repainting and get reported as
+    // not responding for the whole batch.
+    private fun runGeneration(items: List<GenerationItem>, use_random_uuid: Boolean, save_image: Boolean, image_max_dim: Int?, is_ftp: Boolean, ftp_addr: String, ftp_port: Int) {
+        if(items.isEmpty()) {
+            this.showError("There are no virtual amiibos to generate...");
+            return;
+        }
+
+        this.setGenerationDisabled(true);
+
+        val task = object : Task<Unit>() {
+            override fun call() {
+                val failures = mutableListOf<String>();
+
+                for((i, item) in items.withIndex()) {
+                    this.updateMessage("Generating '" + item.amiibo_name + "' (" + (i + 1) + "/" + items.size + ")...");
+                    this.updateProgress((i + 1).toLong(), items.size.toLong());
+
+                    val error = try {
+                        this@MainController.generateAmiibo(item.amiibo_path, item.base_path, item.entry, item.amiibo_name, use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port);
+                    }
+                    catch(ex: Exception) {
+                        ex.toString()
+                    };
+
+                    if(error == null) {
+                        System.out.println("Generated virtual amiibo ('" + item.amiibo_name + "'): '" + item.pres_amiibo_path + "'");
+                    }
+                    else {
+                        System.out.println("Failed to generate virtual amiibo '" + item.pres_amiibo_path + "': " + error);
+                        failures.add("'" + item.pres_amiibo_path + "': " + error);
+                    }
+                }
+
+                val generated = items.size - failures.size;
+                this.updateMessage("Generated " + generated + "/" + items.size + " virtual amiibos.");
+
+                Platform.runLater {
+                    this@MainController.setGenerationDisabled(false);
+
+                    if(failures.isEmpty()) {
+                        if(items.size == 1) {
+                            this@MainController.showInfo("The virtual amiibo was successfully generated!");
+                        }
+                        else {
+                            this@MainController.showInfo("All " + items.size + " virtual amiibos were successfully generated!");
+                        }
+                    }
+                    else {
+                        // One dialog for the whole batch, rather than one per failed amiibo
+                        val listed = failures.take(10).joinToString("\n");
+                        val rest = if(failures.size > 10) "\n(and " + (failures.size - 10) + " more)" else "";
+                        this@MainController.showError("Generated " + generated + "/" + items.size + " virtual amiibos.\n\nThe following could not be generated:\n" + listed + rest);
+                    }
+                }
+            }
+        };
+
+        this.StatusLabel.textProperty().bind(task.messageProperty());
+
+        val task_thr = Thread(task);
+        task_thr.setDaemon(true);
+        task_thr.start();
     }
 
     private fun tryReadApi(url: String) {
@@ -604,12 +673,7 @@ class MainController {
                     if(this@MainController.showYesNo("The virtual amiibo will be generated at:\n" + pres_amiibo_path + "/{amiibo.json, amiibo.flag, ...}\n\nProceed with generation?")) {
                         val selected_amiibo = this@MainController.getSelectedAmiibo();
                         if(selected_amiibo != null) {
-                            if(this@MainController.generateAmiibo(amiibo_path, base_path, selected_amiibo, amiibo_name, use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port)) {
-                                this@MainController.showInfo("The virtual amiibo was successfully generated!");
-                            }
-                            else {
-                                this@MainController.showError("The virtual amiibo could not be generated...");
-                            }
+                            this@MainController.runGeneration(listOf(GenerationItem(amiibo_path, base_path, selected_amiibo, amiibo_name, pres_amiibo_path)), use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port);
                         }
                         else {
                             this@MainController.showError("There is no virtual amiibo selected...");
@@ -641,6 +705,8 @@ class MainController {
                 if(paths != null) {
                     val (path, pres_path) = paths;
                     if(this@MainController.showYesNo("The virtual amiibos will be generated at:\n" + pres_path + "/<series>/<group>/<amiibo>/{amiibo.json, amiibo.flag, ...}\n\nProceed with generation?")) {
+                        val items = mutableListOf<GenerationItem>();
+
                         for(amiibos in this@MainController.Amiibos.values) {
                             val groups = this@MainController.groupAmiibos(amiibos, this@MainController.parseGroupSize(this@MainController.GenerateAllGroupSizeBox));
                             val useGroupDir = groups.size > 1;
@@ -654,20 +720,12 @@ class MainController {
                                         Paths.get(Utils.ensureValidFileDirectoryName(amiibo.series_name), Utils.ensureValidFileDirectoryName(amiibo.amiibo_name)).toString();
                                     };
 
-                                    val amiibo_path = Paths.get(path, base_path).toString();
-                                    val pres_amiibo_path = Paths.get(pres_path, base_path).toString();
-
-                                    if(this@MainController.generateAmiibo(amiibo_path, base_path, amiibo, amiibo_name, use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port)) {
-                                        System.out.println("Generated virtual amiibo ('" + amiibo_name + "'): '" + pres_amiibo_path + "'");
-                                    }
-                                    else {
-                                        this@MainController.showError("The following virtual amiibo could not be generated:\n'" + pres_amiibo_path + "'");
-                                    }
+                                    items.add(GenerationItem(Paths.get(path, base_path).toString(), base_path, amiibo, amiibo_name, Paths.get(pres_path, base_path).toString()));
                                 }
                             }
                         }
 
-                        this@MainController.showInfo("The virtual amiibos were successfully generated!");
+                        this@MainController.runGeneration(items, use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port);
                     }
                 }
             }
@@ -698,6 +756,8 @@ class MainController {
                         val series_name = this@MainController.GenerateSeriesAmiiboSeriesBox.selectionModel.selectedItem;
                         val groups = this@MainController.groupAmiibos(this@MainController.Amiibos.get(series_name)!!, this@MainController.parseGroupSize(this@MainController.GenerateSeriesGroupSizeBox));
                         val useGroupDir = groups.size > 1;
+                        val items = mutableListOf<GenerationItem>();
+
                         for(group in groups) {
                             val group_dir = if(useGroupDir) Utils.ensureValidFileDirectoryName(this@MainController.amiiboGroupName(group)) else null;
                             for(amiibo in group) {
@@ -708,19 +768,11 @@ class MainController {
                                     Utils.ensureValidFileDirectoryName(amiibo.amiibo_name);
                                 };
 
-                                val amiibo_path = Paths.get(path, base_path).toString();
-                                val pres_amiibo_path = Paths.get(pres_path, base_path).toString();
-
-                                if(this@MainController.generateAmiibo(amiibo_path, base_path, amiibo, amiibo_name, use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port)) {
-                                    System.out.println("Generated virtual amiibo ('" + amiibo_name + "'): '" + pres_amiibo_path + "'");
-                                }
-                                else {
-                                    this@MainController.showError("The following virtual amiibo could not be generated:\n'" + pres_amiibo_path + "'");
-                                }
+                                items.add(GenerationItem(Paths.get(path, base_path).toString(), base_path, amiibo, amiibo_name, Paths.get(pres_path, base_path).toString()));
                             }
                         }
 
-                        this@MainController.showInfo("The virtual amiibos were successfully generated!");
+                        this@MainController.runGeneration(items, use_random_uuid, save_image, image_max_dim, is_ftp, ftp_addr, ftp_port);
                     }
                 }
             }
