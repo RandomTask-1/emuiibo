@@ -56,6 +56,8 @@ You will need the following files:
 - emuiibo and emuiigen (formerly emutool) (grab the latest release [here](https://github.com/XorTroll/emuiibo/releases/latest))
 - Ultrahand Overlay (grab the latest [`sdout.zip`](https://github.com/ppkantorski/Ultrahand-Overlay/releases/latest), which already contains nx-ovlloader)
 
+**Since v1.2.0 the overlay requires [Ultrahand Overlay](https://github.com/ppkantorski/Ultrahand-Overlay) instead of Tesla Menu.** If you are upgrading from an older emuiibo, install Ultrahand's `sdout.zip` (it replaces Tesla Menu's `ovlmenu.ovl` and nx-ovlloader). If you already have Ultrahand (for instance from another project that bundles it), there is no need to install it again.
+
 Extract all ZIP files and copy the folders on your SD card. It should look like this in the end:
 
 - *emuiibo*: `sd:/atmosphere/contents/0100000000000352/exefs.nsp` and `/flags` folder
