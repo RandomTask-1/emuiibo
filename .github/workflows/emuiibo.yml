@@ -59,3 +59,5 @@ jobs:
       with:
         name: SdOut
         path: SdOut
+        # The overlay lives in switch/.overlays, which upload-artifact@v4 skips by default
+        include-hidden-files: true
