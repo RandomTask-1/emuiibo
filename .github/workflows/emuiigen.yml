@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - 'emuiigen/**'
+      - '.github/workflows/emuiigen.yml'
+  workflow_dispatch:
 
 jobs:
   emuiigen:
@@ -11,12 +13,12 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: recursive
 
     - name: Setup maven
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
@@ -25,7 +27,7 @@ jobs:
       run: make emuiigen -j$(nproc)
 
     - name: Upload
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: emuiigen
         path: emuiigen/target/emuiigen.jar

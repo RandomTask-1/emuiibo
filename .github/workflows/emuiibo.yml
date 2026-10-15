@@ -1,4 +1,3 @@
-
 name: Build emuiibo
 
 on:
@@ -6,6 +5,10 @@ on:
     paths:
       - 'emuiibo/**'
       - 'overlay/**'
+      - 'libultrahand'
+      - 'Makefile'
+      - '.github/workflows/emuiibo.yml'
+  workflow_dispatch:
 
 jobs:
   emuiibo:
@@ -13,43 +16,39 @@ jobs:
     container: devkitpro/devkita64:latest
 
     steps:
-    - name: Checkout 
-      uses: actions/checkout@v3
+    # The container runs as root; git must be present before checkout so that submodules are cloned
+    - name: Install packages
+      run: |
+        apt-get update
+        apt-get install -y --no-install-recommends git build-essential curl ca-certificates zip
+
+    - name: Checkout
+      uses: actions/checkout@v4
       with:
         submodules: recursive
-      
-    - name: Update packages
-      run: |
-        sudo -n apt-get update
-        sudo -n apt-get upgrade -y git build-essential
 
+    # Pinned to the nightly the sysmodule is known to build with (build-std breaks on some nightlies)
     - name: Prepare Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@master
       with:
-        profile: minimal
-        toolchain: nightly
-        override: true
-
-    - name: Prepare rust-src
-      run: rustup component add rust-src
+        toolchain: nightly-2026-06-28
+        components: rust-src
 
     - name: Prepare cargo-nx
       run: cargo install cargo-nx --git https://github.com/aarch64-switch-rs/cargo-nx
 
-    - name: Checkout latest libnx commit
-      run: |
-        git clone --recurse-submodules https://github.com/switchbrew/libnx.git
+    # Built directly rather than via 'make emuiibo', which runs 'cargo update' and would ignore the committed Cargo.lock
+    - name: Build sysmodule
+      run: cd emuiibo && cargo nx build --release
 
-    - name: Build and install libnx
-      run: |
-        cd libnx
-        make install -j$(nproc)
+    - name: Build overlay
+      run: make -C overlay -j$(nproc)
 
-    - name: Build
-      run: make emuiibo -j$(nproc)
+    - name: Package
+      run: make dist -o sysmodule -o overlay
 
     - name: Upload
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: SdOut
         path: SdOut
