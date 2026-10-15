@@ -1,5 +1,4 @@
 #include <tr/tr_Translation.hpp>
-#include <tesla.hpp>
 #include <unordered_map>
 #include <fstream>
 #include <tr/json.hpp>
@@ -56,29 +55,26 @@ namespace tr {
 
         bool LoadLanguageStrings(const std::string &lang, LanguageStrings &out_strs) {
             out_strs.clear();
-            auto ok = false;
-            tsl::hlp::doWithSDCardHandle([&]() {
-                try {
-                    const auto lang_path = MakeLanguageFilePath(lang);
-                    std::ifstream ifs(lang_path);
-                    const auto lang_json = nlohmann::json::parse(ifs);
+            // The SD card stays mounted while the overlay runs (libultrahand mounts it at startup)
+            try {
+                const auto lang_path = MakeLanguageFilePath(lang);
+                std::ifstream ifs(lang_path);
+                const auto lang_json = nlohmann::json::parse(ifs);
 
-                    if(lang_json.count("strings")) {
-                        for(const auto &str: lang_json["strings"]) {
-                            if(str.count("key") && str.count("value")) {
-                                const auto &key = str["key"].get<std::string>();
-                                const auto &value = str["value"].get<std::string>();
-                                out_strs[key] = value;
-                            }
+                if(lang_json.count("strings")) {
+                    for(const auto &str: lang_json["strings"]) {
+                        if(str.count("key") && str.count("value")) {
+                            const auto &key = str["key"].get<std::string>();
+                            const auto &value = str["value"].get<std::string>();
+                            out_strs[key] = value;
                         }
                     }
-                    ok = true;
                 }
-                catch(std::exception&) {
-                    ok = false;
-                }
-            });
-            return ok;
+                return true;
+            }
+            catch(std::exception&) {
+                return false;
+            }
         }
 
     }

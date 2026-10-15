@@ -100,17 +100,11 @@ pub(crate) fn read_access_id_cache() -> Result<AccessIdCache> {
 pub fn push_access_id_cache(program_id: u64, access_id: nfp::AccessId) -> Result<()> {
     let mut cache_json = read_access_id_cache().unwrap_or(AccessIdCache::new());
 
-    let mut found = false;
-    for entry in cache_json.cache.iter_mut() {
-        if entry.program_id == program_id {
-            entry.access_id = access_id;
-            found = true;
-            break;
-        }
-    }
-
-    if !found {
-        cache_json.cache.push(amiibo::fmt::VirtualAmiiboAreaEntry { program_id, access_id });
+    match cache_json.cache.iter_mut().find(|entry| entry.program_id == program_id) {
+        // Already cached: skip rewriting the file, since this runs for every area of every amiibo the overlay lists
+        Some(entry) if entry.access_id == access_id => return Ok(()),
+        Some(entry) => entry.access_id = access_id,
+        None => cache_json.cache.push(amiibo::fmt::VirtualAmiiboAreaEntry { program_id, access_id })
     }
     write_serialize_json!(ACCESS_ID_CACHE_PATH, &cache_json)?;
     Ok(())

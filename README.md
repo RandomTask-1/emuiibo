@@ -54,13 +54,13 @@ Make sure you always read the README and release changelogs (which are located o
 You will need the following files:
 
 - emuiibo and emuiigen (formerly emutool) (grab the latest release [here](https://github.com/XorTroll/emuiibo/releases/latest))
-- Tesla (grab the latest [Tesla-Menu](https://github.com/WerWolv/Tesla-Menu/releases/latest) and [nx-ovlloader](https://github.com/WerWolv/nx-ovlloader/releases/latest))
+- Ultrahand Overlay (grab the latest [`sdout.zip`](https://github.com/ppkantorski/Ultrahand-Overlay/releases/latest), which already contains nx-ovlloader)
 
 Extract all ZIP files and copy the folders on your SD card. It should look like this in the end:
 
 - *emuiibo*: `sd:/atmosphere/contents/0100000000000352/exefs.nsp` and `/flags` folder
 - *emuiibo overlay*: `sd:/switch/.overlays/emuiibo.ovl`
-- *tesla-menu*: `sd:/switch/.overlays/ovlmenu.ovl`
+- *Ultrahand Overlay*: `sd:/switch/.overlays/ovlmenu.ovl`
 - *nx-ovlloader*: `sd:/atmosphere/contents/420000000007E51A/exefs.nsp` and `/flags` folder
 
 Always keep in mind that (if these contents were placed without turning off the console, using FTP, MTP, etc.) a reboot will be needed for emuiibo to actually work/reload!
@@ -132,7 +132,7 @@ If you set up everything mentioned above, you're ready to use emuiibo ingame.
 
 To see if emuiibo is working ingame, check if emuiibo is intercepting the game when it's trying to access amiibos. If it's not, try launching the game with emuiibo enabled first.
 
-To open the Tesla overlay, hold down **L1 + DPAD-down** and then press **R3 (right stick)**. If you did it, the overlay will open on the left side of the screen. Now choose emuiibo.
+To open the overlay menu (Ultrahand), press its key combo: by default, hold down **ZL + ZR** and then press **DPAD-down** (the combo can be changed in Ultrahand's settings). If you did it, the overlay menu will open on the side of the screen. Now choose emuiibo.
 
 You can see/control the following options in the top part of the overlay:
 
@@ -175,7 +175,7 @@ To go back in the menus, just press **B** button.
 
 ## Compiling
 
-In order to compile emuiibo you need to [setup Rust for Nintendo Switch development](https://github.com/aarch64-switch-rs/setup-guide). You'll also need devkitPro (devkitA64 specifically), in order to compile the overlay.
+In order to compile emuiibo you need to [setup Rust for Nintendo Switch development](https://github.com/aarch64-switch-rs/setup-guide). You'll also need devkitPro (devkitA64 specifically, along with the `switch-curl` and `switch-zlib` packages, whose headers [libultrahand](https://github.com/ppkantorski/libultrahand) includes), in order to compile the overlay.
 
 With this requirements satisfied, simply clone (recursively) this repo and hit `make`
 
@@ -198,6 +198,8 @@ The overlay's code serves a good example to see how to control emuiibo with libn
 - **AD2076** and **AmonRaNet** for helping with the tesla overlay.
 
 - **AmonRaNet** for all the work he put into the overlay.
+
+- **ppkantorski** for [libultrahand](https://github.com/ppkantorski/libultrahand), the libtesla fork the overlay is built with.
 
 - **AmonRaNet**, **Impeeza**, **amazingfate**, **qazrfv1234**, **shadow2560** and **SimoCasa** for providing/helping with translations.
 

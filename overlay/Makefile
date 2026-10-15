@@ -39,22 +39,25 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 APP_TITLE	:= 	emuiibo
 VER_MAJOR	:=	1
-VER_MINOR	:=	1
-VER_MICRO	:=	5
+VER_MINOR	:=	2
+VER_MICRO	:=	0
 APP_VERSION :=	$(VER_MAJOR).$(VER_MINOR).$(VER_MICRO)
 TARGET		:=	$(APP_TITLE)
 BUILD		:=	build
 SOURCES		:=	source source/emu source/tr source/ui
 DATA		:=	data
-INCLUDES	:=	include ../libtesla/include
+INCLUDES	:=	include
 #ROMFS	:=	romfs
+
+# Adds libultrahand's sources (libtesla fork, libultra, cJSON) to SOURCES/INCLUDES
+include $(TOPDIR)/../libultrahand/ultrahand.mk
 
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
-CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
+CFLAGS	:=	-g -Wall -O2 -ffunction-sections -fdata-sections -flto=auto \
 			$(ARCH) $(DEFINES)
 
 CFLAGS	+=	$(INCLUDE) -D__SWITCH__ -DVER_MAJOR=$(VER_MAJOR) -DVER_MINOR=$(VER_MINOR) -DVER_MICRO=$(VER_MICRO)
@@ -62,8 +65,10 @@ CFLAGS	+=	$(INCLUDE) -D__SWITCH__ -DVER_MAJOR=$(VER_MAJOR) -DVER_MINOR=$(VER_MIN
 CXXFLAGS	:= $(CFLAGS) -fexceptions -std=gnu++20
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -Wl,--gc-sections -flto=auto
 
+# libultrahand's download/unzip helpers (curl, mbedtls, zlib, minizip) go unused here,
+# and LTO + --gc-sections drop them, so libnx is the only library needed
 LIBS	:= -lnx
 
 #---------------------------------------------------------------------------------
@@ -193,6 +198,7 @@ all	:	$(OUTPUT).ovl
 $(OUTPUT).ovl	:	$(OUTPUT).nro
 	@cp $(OUTPUT).nro $(OUTPUT).ovl
 	@rm -fr $(OUTPUT).nro
+	@printf 'ULTR' >> $(OUTPUT).ovl
 	@echo built ... $(TARGET).ovl
 
 $(OUTPUT).nro	:	$(OUTPUT).elf $(OUTPUT).nacp

@@ -28,6 +28,19 @@ pub struct VirtualAmiiboData {
     pub mii_charinfo: mii::CharInfo
 }
 
+// Only the name, for listing virtual amiibos without fully loading them
+
+#[derive(nx::ipc::sf::Request, nx::ipc::sf::Response, Copy, Clone, PartialEq, Eq, Debug, Default)]
+#[repr(C)]
+pub struct VirtualAmiiboName {
+    pub name: util::ArrayString<41>
+}
+
+#[derive(Deserialize)]
+struct VirtualAmiiboNameInfo {
+    name: String
+}
+
 // Note: actual amiibo ID in amiibos (nfp services have a different ID type)
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -194,6 +207,20 @@ pub struct VirtualAmiibo {
 }
 
 impl VirtualAmiibo {
+    /// Reads just the name of the virtual amiibo at `path`, skipping everything `try_load` does to make it usable
+    /// (areas, Mii, access ID cache, fixing up missing fields), which happens anyway once it is activated
+    pub fn try_read_name(path: &str) -> Result<VirtualAmiiboName> {
+        let amiibo_flag_path = format!("{}/amiibo.flag", path);
+        result_return_unless!(fsext::exists_file(amiibo_flag_path), rc::ResultVirtualAmiiboFlagNotFound);
+
+        let amiibo_json_path = format!("{}/amiibo.json", path);
+        let name_info = read_deserialize_json!(amiibo_json_path.as_str() => VirtualAmiiboNameInfo)?;
+
+        let mut name: VirtualAmiiboName = Default::default();
+        name.name.set_str(name_info.name.as_str())?;
+        Ok(name)
+    }
+
     pub fn new(info: VirtualAmiiboInfo, areas: VirtualAmiiboAreaInfo, path: String) -> Result<Self> {
         let mut amiibo = Self {
             info: info,

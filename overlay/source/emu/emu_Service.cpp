@@ -127,4 +127,15 @@ namespace emu {
         return serviceDispatchIn(&g_EmuiiboService, 14, uuid_info);
     }
 
+    Result TryGetVirtualAmiiboName(const char *path, const size_t path_size, VirtualAmiiboName *out_name) {
+        return serviceDispatchOut(&g_EmuiiboService, 15, *out_name,
+            .buffer_attrs = {
+                SfBufferAttr_HipcMapAlias | SfBufferAttr_In
+            },
+            .buffers = {
+                { path, path_size }
+            },
+        );
+    }
+
 }

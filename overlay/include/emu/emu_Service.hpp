@@ -28,6 +28,10 @@ namespace emu {
         }
     };
 
+    struct VirtualAmiiboName {
+        char name[40 + 1];
+    };
+
     struct VirtualAmiiboAreaEntry {
         u64 program_id;
         u32 access_id;
@@ -93,5 +97,6 @@ namespace emu {
     Result GetActiveVirtualAmiiboCurrentArea(u32 *out_access_id);
     Result SetActiveVirtualAmiiboCurrentArea(const u32 access_id);
     Result SetActiveVirtualAmiiboUuidInfo(const VirtualAmiiboUuidInfo uuid_info);
+    Result TryGetVirtualAmiiboName(const char *path, const size_t path_size, VirtualAmiiboName *out_name);
 
 }

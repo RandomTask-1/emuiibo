@@ -1,6 +1,6 @@
 [package]
 name = "emuiibo"
-version = "1.1.5"
+version = "1.2.0"
 authors = ["XorTroll"]
 edition = "2024"
 
@@ -175,3 +175,9 @@ kernel_version = "3.0"
 
 [profile.dev]
 lto = true
+
+# Optimized for size: the sysmodule stays resident, and is bound by IPC and SD access rather than CPU
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "s"

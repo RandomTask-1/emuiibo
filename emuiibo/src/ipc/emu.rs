@@ -30,6 +30,7 @@ ipc_sf_define_interface_trait! {
         get_active_virtual_amiibo_current_area [12, version::VersionInterval::all()]: () => (access_id: nfp::AccessId) (access_id: nfp::AccessId);
         set_active_virtual_amiibo_current_area [13, version::VersionInterval::all()]: (access_id: nfp::AccessId) => () ();
         set_active_virtual_amiibo_uuid_info [14, version::VersionInterval::all()]: (uuid_info: amiibo::fmt::VirtualAmiiboUuidInfo) => () ();
+        try_get_virtual_amiibo_name [15, version::VersionInterval::all()]: (path: sf::InMapAliasBuffer<u8>) => (name: amiibo::fmt::VirtualAmiiboName) (name: amiibo::fmt::VirtualAmiiboName);
     }
 }
 
@@ -158,6 +159,12 @@ impl IEmulationServiceServer for EmulationServer {
         result_return_unless!(amiibo.is_some(), rc::ResultInvalidActiveVirtualAmiibo);
 
         amiibo.as_mut().unwrap().set_uuid_info(uuid_info)
+    }
+
+    fn try_get_virtual_amiibo_name(&mut self, path: sf::InMapAliasBuffer<u8>) -> Result<amiibo::fmt::VirtualAmiiboName> {
+        let path_str = path.get_string();
+        log!("TryGetVirtualAmiiboName -- path: '{}'\n", path_str);
+        amiibo::fmt::VirtualAmiibo::try_read_name(path_str.as_str())
     }
 }
 

@@ -1,23 +1,19 @@
-# `v1.1.5`
+# `v1.2.0`
+
+**The overlay now requires [Ultrahand Overlay](https://github.com/ppkantorski/Ultrahand-Overlay) instead of Tesla Menu.** Extract Ultrahand's `sdout.zip` to the root of your SD card (it includes its own nx-ovlloader), then install emuiibo as usual. If you already have Ultrahand (for instance from another project that bundles it), there is no need to install it again.
 
 ## emuiibo
 
-- Fixed a potential crash when producing the in-game nickname of a virtual amiibo whose name contains non-ASCII characters.
+- Added a lightweight command that only reads a virtual amiibo's name, which the overlay now uses to list folders instead of fully loading every amiibo (areas, Mii, access ID cache). Amiibos are still fully loaded when selected.
+- The access ID cache on the SD card is now only rewritten when an entry is new or changed, instead of every time an amiibo with saved game areas is loaded.
+- The sysmodule is now built optimized for size, which reduces its always-resident memory by about 130KB.
 
 ## overlay
 
-- Fixed the emuiibo version mismatch warning never being shown, since the status was always overwritten right after being set.
-
-## emuiigen
-
-- Virtual amiibo names are no longer stripped of spaces/punctuation and clamped to 10 characters, so the overlay now shows the full name (for instance `Link - Link's Awakening` instead of `LinkLinksA`). Games still only see the first 10 characters, which is the actual limit for an amiibo's in-game nickname.
-
-- Generation now runs on a background thread, so the window keeps repainting instead of being reported as not responding for the duration of a batch. Progress is shown in the status bar, and failures are collected into a single report at the end rather than one dialog per amiibo.
-
-### Previously released in `v1.1.4` (emuiigen only)
-
-- Fixed amiibo images being saved in RGB format (the overlay requires RGBA).
-- Oversized images are now downscaled, to prevent upscale errors in the overlay.
-- Added WebP support for AmiiboAPI images served with a `.png` extension.
-- Added an image resolution dropdown (128x128 / 256x256 / 512x512 / unmodified).
-- Added batch grouping: amiibos can be split into alphabetical folders by a configurable group size (0 / 5 / 10 / 15 / 20), for better overlay performance.
+- Migrated from libtesla to [libultrahand](https://github.com/ppkantorski/libultrahand). The overlay follows your Ultrahand theme, wallpaper, footer language, and sound/haptic settings.
+- The L/R (emulation off/on) and ZL/ZR (random UUID off/on) shortcuts now act on a quick tap of that button alone, on release. Opening or closing the overlay with Ultrahand's default combo (ZL + ZR + DPAD-down) no longer changes the active amiibo's random UUID setting.
+- These shortcuts now also work when no list item is focused (for instance in an empty folder).
+- Fixed the focused amiibo's image being decoded again on every frame, which slowed down the overlay while browsing.
+- Reduced the overlay's memory usage by about 144KB: the buffer used to read game titles for the active amiibo's areas is now only allocated while reading them.
+- Folders open much faster: amiibo names are now read with the new lightweight command, and saved to an index (in `sd:/emuiibo/overlay/cache`) the first time a folder is opened, so later visits skip reading each amiibo entirely. For instance, a folder of ~500 amiibos went from ~4 seconds to ~2 seconds on the first visit, and well under a tenth of a second afterwards. If an amiibo's name is edited in place, delete the `cache` folder to rebuild the indexes.
+- Touch input follows Ultrahand's behavior (tapping a row focuses it, sliding off a row cancels the tap).
