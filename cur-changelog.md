@@ -1,14 +1,20 @@
 # `v1.2.0`
 
-**The overlay now requires [Ultrahand Overlay](https://github.com/ppkantorski/Ultrahand-Overlay) instead of Tesla Menu.** Extract Ultrahand's `sdout.zip` to the root of your SD card (it includes its own nx-ovlloader), then install emuiibo as usual. If you already have Ultrahand (for instance from another project that bundles it), there is no need to install it again.
+## Highlights
 
-## emuiibo
+- **Converted to Ultrahand.** The overlay now runs under [Ultrahand Overlay](https://github.com/ppkantorski/Ultrahand-Overlay) instead of Tesla Menu, and follows your Ultrahand theme, wallpaper, footer language, and sound/haptic settings. **If you don't have Ultrahand yet, extract its `sdout.zip` to the root of your SD card** (it includes its own nx-ovlloader), then install emuiibo as usual. If you already have Ultrahand (for instance from another project that bundles it), there is no need to install it again.
+- **Optimized memory usage.** The emuiibo sysmodule, which runs all the time, now uses about 130KB less memory, and the overlay about 144KB less. This matters more since recent firmware gives overlays less memory.
+- **Faster menus, with caching.** Folders are now listed by reading only each amiibo's name, and the names are cached after the first visit. A folder of ~500 amiibos went from ~4 seconds to ~2 seconds on the first visit, and opens in under a tenth of a second afterwards.
+
+## Details
+
+### emuiibo
 
 - Added a lightweight command that only reads a virtual amiibo's name, which the overlay now uses to list folders instead of fully loading every amiibo (areas, Mii, access ID cache). Amiibos are still fully loaded when selected.
 - The access ID cache on the SD card is now only rewritten when an entry is new or changed, instead of every time an amiibo with saved game areas is loaded.
 - The sysmodule is now built optimized for size, which reduces its always-resident memory by about 130KB.
 
-## overlay
+### overlay
 
 - Migrated from libtesla to [libultrahand](https://github.com/ppkantorski/libultrahand). The overlay follows your Ultrahand theme, wallpaper, footer language, and sound/haptic settings.
 - The L/R (emulation off/on) and ZL/ZR (random UUID off/on) shortcuts now act on a quick tap of that button alone, on release. Opening or closing the overlay with Ultrahand's default combo (ZL + ZR + DPAD-down) no longer changes the active amiibo's random UUID setting.
